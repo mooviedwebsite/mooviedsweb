@@ -59,7 +59,7 @@ html, body {
 #quality-canvas {
   position: absolute; top: 0; left: 0; width: 100%; height: 100%;
   object-fit: contain; display: none; background: #000;
-  image-rendering: pixelated;
+  image-rendering: auto;
 }
 #gradient-top {
   position: absolute; top: 0; left: 0; right: 0; height: 160px;
@@ -965,15 +965,48 @@ function updateVolIcon() {
 }
 
 // ════════════════════════════════════════════════
-// CANVAS QUALITY ENGINE
+// CANVAS QUALITY ENGINE — two-pass rendering
+// Pass 1: video → small buffer (smooth bilinear downscale, real detail loss)
+// Pass 2: buffer → display canvas (nearest-neighbor upscale, realistic blockiness)
 // ════════════════════════════════════════════════
+let _bufCanvas=null;
+
 function startCanvasRender(targetW,targetH){
   stopCanvasRender();
-  qualCanvas.width=targetW; qualCanvas.height=targetH;
+
+  // Clamp target to actual source size (no upscaling artefacts above source res)
+  const srcW=detectedWidth||vid.videoWidth||1920;
+  const srcH=detectedHeight||vid.videoHeight||1080;
+  const tW=Math.min(targetW,srcW);
+  const tH=Math.min(targetH,srcH);
+
+  // Off-screen buffer at target (low) resolution — smooth downscale
+  if(!_bufCanvas) _bufCanvas=document.createElement('canvas');
+  _bufCanvas.width=tW; _bufCanvas.height=tH;
+  const bCtx=_bufCanvas.getContext('2d');
+  bCtx.imageSmoothingEnabled=true;
+  bCtx.imageSmoothingQuality='high';
+
+  // Display canvas at native video resolution so CSS object-fit:contain letterboxes correctly
+  qualCanvas.width=srcW; qualCanvas.height=srcH;
+  // Nearest-neighbour upscale from buffer → display canvas = realistic blockiness
+  qualCtx.imageSmoothingEnabled=false;
+
   qualCanvas.style.display='block'; vid.style.opacity='0';
-  function drawFrame(){ if(vid.readyState>=2) qualCtx.drawImage(vid,0,0,targetW,targetH); canvasRafId=requestAnimationFrame(drawFrame); }
+
+  function drawFrame(){
+    if(vid.readyState>=2){
+      // Step 1: downscale to tiny buffer (loses real detail)
+      bCtx.drawImage(vid,0,0,tW,tH);
+      // Step 2: upscale back to full native res (nearest-neighbour = blocky/pixelated)
+      qualCtx.clearRect(0,0,srcW,srcH);
+      qualCtx.drawImage(_bufCanvas,0,0,srcW,srcH);
+    }
+    canvasRafId=requestAnimationFrame(drawFrame);
+  }
   drawFrame();
 }
+
 function stopCanvasRender(){
   if(canvasRafId){cancelAnimationFrame(canvasRafId);canvasRafId=null;}
   qualCanvas.style.display='none'; vid.style.opacity='1';
