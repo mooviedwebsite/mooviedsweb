@@ -113,6 +113,7 @@ function doGet(e) {
     else if (action === "getWatchHistory") result = getWatchHistory(e.parameter.userId);
     else if (action === "getBookmarks")  result = getBookmarks(e.parameter.userId);
     else if (action === "getMovieLikes") result = getMovieLikes(e.parameter.movieId);
+    else if (action === "getAdsConfig")  result = getAdsConfig();
     else result = { success: false, error: "Unknown action: " + action };
   } catch(err) { result = { success: false, error: err.toString() }; }
   return jsonResponse(result);
@@ -147,6 +148,7 @@ function doPost(e) {
     else if (action === "toggleMovieLike") result = toggleMovieLike(body.userId, body.movieId);
     else if (action === "sendEmailToUser") result = sendEmailToUser(body.userId, body.subject, body.htmlBody);
     else if (action === "sendEmailToAll")  result = sendEmailToAll(body.subject, body.htmlBody);
+    else if (action === "saveAdsConfig")  result = saveAdsConfig(body.config);
     else result = { success: false, error: "Unknown action: " + action };
   } catch(err) { result = { success: false, error: err.toString() }; }
   return jsonResponse(result);
@@ -695,6 +697,30 @@ function sendEmailToAll(subject, htmlBody) {
 }
 
 // ════════════════════════════════════════════════════════════════════════════
+// ADS CONFIG  — stored in PropertiesService (global, shared across all users)
+// ════════════════════════════════════════════════════════════════════════════
+
+function getAdsConfig() {
+  var props = PropertiesService.getScriptProperties();
+  var raw   = props.getProperty("moovied_ads_config");
+  if (!raw) return { success: true, config: {} };
+  try {
+    return { success: true, config: JSON.parse(raw) };
+  } catch(ex) {
+    return { success: true, config: {} };
+  }
+}
+
+function saveAdsConfig(config) {
+  if (!config || typeof config !== "object")
+    return { success: false, error: "Invalid config" };
+  PropertiesService.getScriptProperties().setProperty(
+    "moovied_ads_config", JSON.stringify(config)
+  );
+  return { success: true };
+}
+
+// ════════════════════════════════════════════════════════════════════════════
 // SETUP  — run once from the Apps Script editor
 // ════════════════════════════════════════════════════════════════════════════
 
@@ -703,3 +729,4 @@ function setupSheets() {
     .forEach(function(name){ getSheet(name); });
   Logger.log("All sheets initialised successfully.");
 }
+ 
