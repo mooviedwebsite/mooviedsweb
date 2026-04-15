@@ -1,74 +1,11 @@
 {
-  "popup": {
-    "enabled": false,
-    "scriptUrl": "",
-    "adKey": "",
-    "width": 0,
-    "height": 0,
-    "code": ""
-  },
-  "social_bar": {
-    "enabled": false,
-    "scriptUrl": "",
-    "adKey": "",
-    "width": 0,
-    "height": 0,
-    "code": ""
-  },
-  "banner_home_top": {
-    "enabled": false,
-    "scriptUrl": "",
-    "adKey": "",
-    "width": 728,
-    "height": 90,
-    "code": ""
-  },
-  "native_home": {
-    "enabled": false,
-    "scriptUrl": "",
-    "adKey": "",
-    "width": 0,
-    "height": 0,
-    "code": ""
-  },
-  "banner_search": {
-    "enabled": false,
-    "scriptUrl": "",
-    "adKey": "",
-    "width": 728,
-    "height": 90,
-    "code": ""
-  },
-  "banner_movie_top": {
-    "enabled": false,
-    "scriptUrl": "",
-    "adKey": "",
-    "width": 728,
-    "height": 90,
-    "code": ""
-  },
-  "banner_movie_mid": {
-    "enabled": false,
-    "scriptUrl": "",
-    "adKey": "",
-    "width": 728,
-    "height": 90,
-    "code": ""
-  },
-  "sidebar_movie": {
-    "enabled": true,
-    "scriptUrl": "",
-    "adKey": "",
-    "width": 300,
-    "height": 248,
-    "code": "<script>\n  atOptions = {\n    'key' : '77e9cf5808d2f3860ea6f532ed1d9627',\n    'format' : 'iframe',\n    'height' : 250,\n    'width' : 300,\n    'params' : {}\n  };\n</script>\n<script src=\"https://www.highperformanceformat.com/77e9cf5808d2f3860ea6f532ed1d9627/invoke.js\"></script>\n"
-  },
-  "sidebar_movie_2": {
-    "enabled": true,
-    "scriptUrl": "",
-    "adKey": "",
-    "width": 300,
-    "height": 250,
-    "code": "<script>\n  atOptions = {\n    'key' : '77e9cf5808d2f3860ea6f532ed1d9627',\n    'format' : 'iframe',\n    'height' : 250,\n    'width' : 300,\n    'params' : {}\n  };\n</script>\n<script src=\"https://www.highperformanceformat.com/77e9cf5808d2f3860ea6f532ed1d9627/invoke.js\"></script>\n"
-  }
+  "popup":            { "enabled": false, "scriptUrl": "", "adKey": "", "width": 0,   "height": 0,   "code": "" },
+  "social_bar":       { "enabled": false, "scriptUrl": "", "adKey": "", "width": 0,   "height": 0,   "code": "" },
+  "banner_home_top":  { "enabled": false, "scriptUrl": "", "adKey": "", "width": 728, "height": 90,  "code": "" },
+  "native_home":      { "enabled": false, "scriptUrl": "", "adKey": "", "width": 0,   "height": 0,   "code": "" },
+  "banner_search":    { "enabled": false, "scriptUrl": "", "adKey": "", "width": 728, "height": 90,  "code": "" },
+  "banner_movie_top": { "enabled": false, "scriptUrl": "", "adKey": "", "width": 728, "height": 90,  "code": "" },
+  "banner_movie_mid": { "enabled": false, "scriptUrl": "", "adKey": "", "width": 728, "height": 90,  "code": "" },
+  "sidebar_movie":    { "enabled": false, "scriptUrl": "", "adKey": "", "width": 160, "height": 600, "code": "" },
+  "sidebar_movie_2":  { "enabled": false, "scriptUrl": "", "adKey": "", "width": 160, "height": 600, "code": "" }
 }
