@@ -46,6 +46,7 @@ function initSheetHeaders(sheet, name) {
   else if (name === "Bookmarks")    headers = ["id","user_id","movie_id","bookmarked_at"];
   else if (name === "MovieLikes")   headers = ["id","movie_id","user_id","liked_at"];
   else if (name === "ActivityLogs") headers = ["id","user_id","action","timestamp"];
+  else if (name === "AdsConfig")    headers = ["key","value","updated_at"];
   else return;
   sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
 }
@@ -697,26 +698,67 @@ function sendEmailToAll(subject, htmlBody) {
 }
 
 // ════════════════════════════════════════════════════════════════════════════
-// ADS CONFIG  — stored in PropertiesService (global, shared across all users)
+// ADS CONFIG  — stored in "AdsConfig" sheet (one row per key, visible in sheet)
+//              Also mirrored in PropertiesService for fast reads
 // ════════════════════════════════════════════════════════════════════════════
 
 function getAdsConfig() {
-  var props = PropertiesService.getScriptProperties();
-  var raw   = props.getProperty("moovied_ads_config");
-  if (!raw) return { success: true, config: {} };
+  // Fast path: PropertiesService
   try {
-    return { success: true, config: JSON.parse(raw) };
-  } catch(ex) {
-    return { success: true, config: {} };
-  }
+    var props = PropertiesService.getScriptProperties();
+    var raw   = props.getProperty("moovied_ads_config");
+    if (raw) {
+      var parsed = JSON.parse(raw);
+      if (parsed && Object.keys(parsed).length > 0) {
+        return { success: true, config: parsed };
+      }
+    }
+  } catch(ex) {}
+
+  // Fallback: read from AdsConfig sheet
+  try {
+    var sheet = getSheet("AdsConfig");
+    var data  = sheet.getDataRange().getValues();
+    if (data.length <= 1) return { success: true, config: {} };
+    for (var i = 1; i < data.length; i++) {
+      if (String(data[i][0]) === "ads_config" && data[i][1]) {
+        return { success: true, config: JSON.parse(String(data[i][1])) };
+      }
+    }
+  } catch(ex) {}
+
+  return { success: true, config: {} };
 }
 
 function saveAdsConfig(config) {
   if (!config || typeof config !== "object")
     return { success: false, error: "Invalid config" };
-  PropertiesService.getScriptProperties().setProperty(
-    "moovied_ads_config", JSON.stringify(config)
-  );
+
+  var json = JSON.stringify(config);
+  var now  = new Date().toISOString();
+
+  // Save to PropertiesService (fast reads)
+  try {
+    PropertiesService.getScriptProperties().setProperty("moovied_ads_config", json);
+  } catch(ex) {}
+
+  // Save to AdsConfig sheet (visible in spreadsheet)
+  try {
+    var sheet   = getSheet("AdsConfig");
+    var allData = sheet.getDataRange().getValues();
+    for (var i = 1; i < allData.length; i++) {
+      if (String(allData[i][0]) === "ads_config") {
+        sheet.getRange(i + 1, 2).setValue(json);
+        sheet.getRange(i + 1, 3).setValue(now);
+        return { success: true };
+      }
+    }
+    // Row doesn't exist yet — append it
+    sheet.appendRow(["ads_config", json, now]);
+  } catch(ex) {
+    return { success: false, error: ex.toString() };
+  }
+
   return { success: true };
 }
 
@@ -725,7 +767,7 @@ function saveAdsConfig(config) {
 // ════════════════════════════════════════════════════════════════════════════
 
 function setupSheets() {
-  ["Users","Movies","Comments","WatchHistory","Bookmarks","MovieLikes","ActivityLogs"]
+  ["Users","Movies","Comments","WatchHistory","Bookmarks","MovieLikes","ActivityLogs","AdsConfig"]
     .forEach(function(name){ getSheet(name); });
   Logger.log("All sheets initialised successfully.");
 }
