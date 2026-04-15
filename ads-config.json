@@ -48,12 +48,12 @@
     "code": ""
   },
   "banner_movie_mid": {
-    "enabled": false,
+    "enabled": true,
     "scriptUrl": "",
     "adKey": "",
     "width": 728,
     "height": 90,
-    "code": ""
+    "code": "<script>\n  atOptions = {\n    'key' : '168a0166d248853826b58edb4a5832e7',\n    'format' : 'iframe',\n    'height' : 90,\n    'width' : 728,\n    'params' : {}\n  };\n</script>\n<script src=\"https://www.highperformanceformat.com/168a0166d248853826b58edb4a5832e7/invoke.js\"></script>\n"
   },
   "sidebar_movie": {
     "enabled": true,
