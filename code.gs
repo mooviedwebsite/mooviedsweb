@@ -127,6 +127,19 @@ function doGet(e) {
     else if (action === "getBookmarks")     result = getBookmarks(e.parameter.userId);
     else if (action === "getMovieLikes")    result = getMovieLikes(e.parameter.movieId);
     else if (action === "getAdsConfig")     result = getAdsConfig();
+    // Write actions via GET (server sync — uses pre-set id from server)
+    else if (action === "addComment")      result = addComment(
+      e.parameter.movieId || e.parameter.movie_id,
+      e.parameter.userId  || e.parameter.user_id,
+      e.parameter.userName || e.parameter.user_name || "Anonymous",
+      e.parameter.content,
+      e.parameter.reply_to || "",
+      e.parameter.reply_to_name || "",
+      e.parameter.id
+    );
+    else if (action === "editComment")     result = editComment(e.parameter.id, e.parameter.content);
+    else if (action === "deleteComment")   result = deleteComment(e.parameter.id);
+    else if (action === "likeComment")     result = likeComment(e.parameter.id);
     else result = { success: false, error: "Unknown action: " + action };
   } catch(err) { result = { success: false, error: err.toString() }; }
   return jsonResponse(result);
@@ -159,7 +172,7 @@ function doPost(e) {
     else if (action === "deleteMovie")       result = deleteMovie(body.id);
     else if (action === "addViewCount")      result = addViewCount(movieId, userId);
     else if (action === "logActivity")       result = logActivity(userId, body.action);
-    else if (action === "addComment")        result = addComment(movieId, userId, userName, body.content, replyTo, replyToName);
+    else if (action === "addComment")        result = addComment(movieId, userId, userName, body.content, replyTo, replyToName, body.id);
     else if (action === "editComment")       result = editComment(body.id, body.content);
     else if (action === "deleteComment")     result = deleteComment(body.id);
     else if (action === "likeComment")       result = likeComment(body.id);
@@ -425,12 +438,13 @@ function getAllComments() {
   return { success:true, comments:comments };
 }
 
-function addComment(movieId, userId, userName, content, replyTo, replyToName) {
+function addComment(movieId, userId, userName, content, replyTo, replyToName, externalId) {
   if (!movieId || !userId || !content) return { success:false, error:"movieId, userId and content are required" };
   var sheet = getSheet("Comments");
   ensureColumns(sheet, COMMENT_FIELDS);
   var headers = sheet.getDataRange().getValues()[0];
-  var id  = generateId();
+  // Use server-provided ID so local file and sheet share the same UUID
+  var id  = externalId || generateId();
   var now = new Date().toISOString();
   var row = headers.map(function(h) {
     if (h==="id")            return id;
