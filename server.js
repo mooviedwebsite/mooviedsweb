@@ -61,9 +61,10 @@ function readBody(req) {
   });
 }
 
-// Fetch a URL using native https/http — returns parsed JSON or throws
-function fetchUrl(targetUrl, opts = {}) {
+// Fetch a URL using native https/http with redirect following — returns parsed JSON or throws
+function fetchUrl(targetUrl, opts = {}, redirects = 0) {
   return new Promise((resolve, reject) => {
+    if (redirects > 10) return reject(new Error('Too many redirects'));
     const parsed = new URL(targetUrl);
     const lib    = parsed.protocol === 'https:' ? https : http;
     const options = {
@@ -71,9 +72,23 @@ function fetchUrl(targetUrl, opts = {}) {
       port:     parsed.port || (parsed.protocol === 'https:' ? 443 : 80),
       path:     parsed.pathname + parsed.search,
       method:   opts.method || 'GET',
-      headers:  opts.headers || {},
+      headers:  { 'User-Agent': 'MOOVIED-Server/1.0', ...(opts.headers || {}) },
     };
     const req = lib.request(options, (res) => {
+      // Follow redirects (301, 302, 303, 307, 308)
+      if ([301, 302, 303, 307, 308].includes(res.statusCode) && res.headers.location) {
+        const redirectUrl = res.headers.location.startsWith('http')
+          ? res.headers.location
+          : new URL(res.headers.location, targetUrl).href;
+        // 301/302/303 → switch to GET (browser standard behavior, required for GAS)
+        const switchToGet = [301, 302, 303].includes(res.statusCode);
+        const redirectOpts = switchToGet
+          ? { ...opts, method: 'GET', body: undefined, headers: { 'User-Agent': 'MOOVIED-Server/1.0' } }
+          : opts;
+        res.resume(); // drain the response
+        fetchUrl(redirectUrl, redirectOpts, redirects + 1).then(resolve).catch(reject);
+        return;
+      }
       let body = '';
       res.on('data', c => body += c);
       res.on('end', () => {
@@ -87,20 +102,31 @@ function fetchUrl(targetUrl, opts = {}) {
   });
 }
 
-// Call GAS GET action
+// Call GAS GET action — tries all URLs, returns first successful response
 async function gasGet(action, extra = {}) {
   const params = new URLSearchParams({ action, ...extra });
+  let lastErr = 'GAS unreachable';
   for (const gasUrl of GAS_URLS) {
     try {
       const r = await fetchUrl(`${gasUrl}?${params}`);
-      if (r.body && r.body.success !== undefined) return r.body;
-    } catch {}
+      if (r.body) {
+        // Only accept a response from this URL if it actually handled the action
+        if (r.body.success === true) return r.body;
+        // If it failed due to unknown action, try the next URL
+        if (r.body.error && r.body.error.startsWith('Unknown action')) {
+          lastErr = `Action not found on ${gasUrl}`; continue;
+        }
+        // Any other error (auth, etc.) — return it
+        return r.body;
+      }
+    } catch (e) { lastErr = e.message; }
   }
-  return { success: false, error: 'GAS unreachable' };
+  return { success: false, error: lastErr };
 }
 
-// Call GAS POST action
+// Call GAS POST action — tries all URLs, returns first successful response
 async function gasPost(body) {
+  let lastErr = 'GAS unreachable';
   for (const gasUrl of GAS_URLS) {
     try {
       const r = await fetchUrl(gasUrl, {
@@ -108,10 +134,16 @@ async function gasPost(body) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
       });
-      if (r.body && r.body.success !== undefined) return r.body;
-    } catch {}
+      if (r.body) {
+        if (r.body.success === true) return r.body;
+        if (r.body.error && r.body.error.startsWith('Unknown action')) {
+          lastErr = `Action not found on ${gasUrl}`; continue;
+        }
+        return r.body;
+      }
+    } catch (e) { lastErr = e.message; }
   }
-  return { success: false, error: 'GAS unreachable' };
+  return { success: false, error: lastErr };
 }
 
 // Push a file to GitHub
