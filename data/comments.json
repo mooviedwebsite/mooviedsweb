@@ -1,1 +1,14 @@
-{"updated_at":"2025-01-01T00:00:00.000Z","comments":[]}
+[
+  {
+    "id": "59493665-6613-4535-a165-48b11348a8aa",
+    "movie_id": "movie-test-1",
+    "user_id": "user-123",
+    "user_name": "TestUser",
+    "content": "This is a great movie!",
+    "timestamp": "2026-04-16T12:51:20.484Z",
+    "likes": 0,
+    "edited": false,
+    "reply_to": "",
+    "reply_to_name": ""
+  }
+]
