@@ -262,9 +262,9 @@ const INJECT_SCRIPT = `<script>
   localStorage.setItem('moovied_comments_api_url', api);
   localStorage.setItem('moovied_api_server_url', api);
 
-  // Point the GAS URL to the latest deployment (fixes "GAS not connected" banner)
+  // Always point GAS URL to latest deployment (fixes "GAS not connected" banner)
   var curGas = localStorage.getItem('moovied_gas_url');
-  if (!curGas || curGas === gasOld) {
+  if (!curGas || curGas === gasOld || curGas.indexOf('AKfycbz') !== -1) {
     localStorage.setItem('moovied_gas_url', gasNew);
   }
 })();
@@ -288,8 +288,8 @@ async function handleApi(req, res, apiPath) {
   if (method === 'OPTIONS') {
     res.writeHead(204, {
       'Access-Control-Allow-Origin': '*',
-      'Access-Control-Allow-Methods': 'GET,POST,PUT,DELETE,OPTIONS',
-      'Access-Control-Allow-Headers': 'Content-Type',
+      'Access-Control-Allow-Methods': 'GET,POST,PUT,PATCH,DELETE,OPTIONS',
+      'Access-Control-Allow-Headers': 'Content-Type,Authorization',
     });
     res.end();
     return;
@@ -309,47 +309,59 @@ async function handleApi(req, res, apiPath) {
   }
 
   // ── POST /api/comments ── (add comment) ───────────────────────────────────
-  // GAS POST always returns 302 (data IS saved to sheet). We build the response
-  // on the server side and return immediately, then fire-and-forget to GAS.
+  // Frontend sends snake_case (movie_id, user_id, user_name) — accept both forms.
+  // GAS POST always returns 302 (data IS saved). We build the response immediately
+  // and fire-and-forget the sheet write in the background.
   if (apiPath === '/comments' && method === 'POST') {
     const body = await readBody(req);
-    if (!body.movieId || !body.userId || !body.content) {
-      return json(res, { success: false, error: 'movieId, userId, content are required' }, 400);
+    // Accept both snake_case (frontend native) and camelCase
+    const movieId  = body.movie_id  || body.movieId;
+    const userId   = body.user_id   || body.userId;
+    const userName = body.user_name || body.userName || 'Anonymous';
+    const content  = body.content;
+    const replyTo      = body.reply_to      || '';
+    const replyToName  = body.reply_to_name || '';
+
+    if (!movieId || !userId || !content) {
+      return json(res, { success: false, error: 'movie_id, user_id and content are required' }, 400);
     }
+
     const commentId = crypto.randomUUID();
     const timestamp = new Date().toISOString();
     const comment = {
-      id:           commentId,
-      movie_id:     body.movieId,
-      user_id:      body.userId,
-      user_name:    body.userName || 'Anonymous',
-      content:      body.content,
+      id:        commentId,
+      movie_id:  movieId,
+      user_id:   userId,
+      user_name: userName,
+      content,
       timestamp,
-      likes:        0,
-      edited:       false,
+      likes:     0,
+      edited:    false,
     };
-    if (body.reply_to)      comment.reply_to      = body.reply_to;
-    if (body.reply_to_name) comment.reply_to_name = body.reply_to_name;
+    if (replyTo)     comment.reply_to      = replyTo;
+    if (replyToName) comment.reply_to_name = replyToName;
 
-    // Fire to GAS (saves to Google Sheet) — don't wait for redirect chain
+    // Fire to GAS to save in Google Sheet (non-blocking)
     gasFirePost({
       action:        'addComment',
-      movieId:       body.movieId,
-      userId:        body.userId,
-      userName:      body.userName || 'Anonymous',
-      content:       body.content,
-      reply_to:      body.reply_to      || '',
-      reply_to_name: body.reply_to_name || '',
+      movieId,
+      userId,
+      userName,
+      content,
+      reply_to:      replyTo,
+      reply_to_name: replyToName,
     }).catch(() => {});
 
     return json(res, { success: true, comment });
   }
 
-  // ── PUT /api/comments/:id ── (edit comment) ───────────────────────────────
+  // ── PUT or PATCH /api/comments/:id ── (edit comment) ──────────────────────
+  // Frontend sends PATCH; we also accept PUT for admin panel compatibility.
   const editMatch = apiPath.match(/^\/comments\/([^/]+)$/);
-  if (editMatch && method === 'PUT') {
+  if (editMatch && (method === 'PUT' || method === 'PATCH')) {
     const body = await readBody(req);
-    gasFirePost({ action: 'editComment', id: editMatch[1], content: body.content }).catch(() => {});
+    const commentId = editMatch[1];
+    gasFirePost({ action: 'editComment', id: commentId, content: body.content }).catch(() => {});
     return json(res, { success: true });
   }
 
