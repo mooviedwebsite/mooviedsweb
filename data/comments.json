@@ -1,12 +1,1 @@
-[
-  {
-    "id": "3ded7c65-3fca-4f21-812e-93d08ba61e49",
-    "movie_id": "moovied-test",
-    "user_id": "user-777",
-    "user_name": "Rawnidu",
-    "content": "Real test comment — checking GAS sheet sync!",
-    "timestamp": "2026-04-16T13:04:11.667Z",
-    "likes": 0,
-    "edited": false
-  }
-]
+[]
