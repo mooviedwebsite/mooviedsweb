@@ -10,9 +10,8 @@ const BASE_PATH = '/Admin-Log-Sync';
 const ROOT_DIR  = __dirname;
 
 // ── GAS & GitHub config ───────────────────────────────────────────────────────
-// NEW deployment first (has all latest actions including addComment, getAllComments, etc.)
-const GAS_URL_PRIMARY   = 'https://script.google.com/macros/s/AKfycbwZh3CodBYIMDCqIFKQhT28FkRHYpaoQUNlRsstxZf8eMO_GjPpr4zCMsLbQ5-aGA3v8g/exec';
-const GAS_URL_SECONDARY = 'https://script.google.com/macros/s/AKfycbzZEAcXt4lp0t_FVdIgJR2dKQARlIdY8MkuHjwxfadN5Wpj4v7GOQr1Xo7OhQWd3h8k/exec';
+const GAS_URL_PRIMARY   = 'https://script.google.com/macros/s/AKfycbxIz_Cp3iSlHCOmGE_h2ucp2a4zGsOqZY6WaOhIJpR8nggw-bvajcFYU119aKbUQ5hO/exec';
+const GAS_URL_SECONDARY = 'https://script.google.com/macros/s/AKfycbwZh3CodBYIMDCqIFKQhT28FkRHYpaoQUNlRsstxZf8eMO_GjPpr4zCMsLbQ5-aGA3v8g/exec';
 const GAS_URLS = [ GAS_URL_PRIMARY, GAS_URL_SECONDARY ];
 const GITHUB_TOKEN = process.env.GITHUB_TOKEN || '';
 const GITHUB_OWNER = 'mooviedwebsite';
@@ -254,19 +253,10 @@ function saveAutosyncConfig(cfg) {
 const INJECT_SCRIPT = `<script>
 (function(){
   var api = window.location.origin + '/api';
-  var oldApi = 'https://a16cbf22-021e-4fbd-a6d1-5c8d3c7e4244-00-923mtzjoxrcz.worf.replit.dev/api';
   var gasNew = '${GAS_URL_PRIMARY}';
-  var gasOld = '${GAS_URL_SECONDARY}';
-
-  // Always point comments & server URLs to THIS server's proxy
   localStorage.setItem('moovied_comments_api_url', api);
   localStorage.setItem('moovied_api_server_url', api);
-
-  // Always point GAS URL to latest deployment (fixes "GAS not connected" banner)
-  var curGas = localStorage.getItem('moovied_gas_url');
-  if (!curGas || curGas === gasOld || curGas.indexOf('AKfycbz') !== -1) {
-    localStorage.setItem('moovied_gas_url', gasNew);
-  }
+  localStorage.setItem('moovied_gas_url', gasNew);
 })();
 </script>`;
 
