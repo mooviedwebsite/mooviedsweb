@@ -10,7 +10,7 @@ const BASE_PATH = '/Admin-Log-Sync';
 const ROOT_DIR  = __dirname;
 
 // ── GAS & GitHub config ───────────────────────────────────────────────────────
-const GAS_URL = 'https://script.google.com/macros/s/AKfycbxIz_Cp3iSlHCOmGE_h2ucp2a4zGsOqZY6WaOhIJpR8nggw-bvajcFYU119aKbUQ5hO/exec';
+const GAS_URL = 'https://script.google.com/macros/s/AKfycbwMcrOMCPmRMgbWunm0eQnweODbktt_6yvv8oKR8p61_n4ULAsuCD2wBtokaNPN4VyT/exec';
 const GITHUB_TOKEN  = process.env.GITHUB_TOKEN || '';
 const GITHUB_OWNER  = 'mooviedwebsite';
 const GITHUB_REPO   = 'Admin-Log-Sync';
