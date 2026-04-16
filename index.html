@@ -8,7 +8,6 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Bebas+Neue&display=swap" rel="stylesheet">
-    <!-- Pre-warm GAS + GitHub + ad-network connections so first fetch is faster -->
     <link rel="preconnect" href="https://script.google.com">
     <link rel="dns-prefetch" href="https://script.google.com">
     <link rel="preconnect" href="https://script.googleusercontent.com">
@@ -18,6 +17,26 @@
     <link rel="dns-prefetch" href="https://pl.highperformanceformat.com">
     <link rel="dns-prefetch" href="https://syndication.realsrv.com">
     <link rel="dns-prefetch" href="https://a.magsrv.com">
+
+    <!-- MOOVIED API BOOTSTRAP — sets correct API URLs before React loads -->
+    <script>
+    (function () {
+      var GAS_NEW = 'https://script.google.com/macros/s/AKfycbwZh3CodBYIMDCqIFKQhT28FkRHYpaoQUNlRsstxZf8eMO_GjPpr4zCMsLbQ5-aGA3v8g/exec';
+      var GAS_OLD = 'https://script.google.com/macros/s/AKfycbzZEAcXt4lp0t_FVdIgJR2dKQARlIdY8MkuHjwxfadN5Wpj4v7GOQr1Xo7OhQWd3h8k/exec';
+      var API    = window.location.origin + '/api';
+
+      // Always set these so the React app picks up the correct URLs
+      localStorage.setItem('moovied_comments_api_url', API);
+      localStorage.setItem('moovied_api_server_url',   API);
+
+      // Update GAS URL to latest deployment if it's missing or still the old one
+      var curGas = localStorage.getItem('moovied_gas_url') || '';
+      if (!curGas || curGas === GAS_OLD || curGas.indexOf('AKfycbz') !== -1) {
+        localStorage.setItem('moovied_gas_url', GAS_NEW);
+      }
+    })();
+    </script>
+
     <script type="module" crossorigin src="/Admin-Log-Sync/assets/index-BuQk6LBC.js"></script>
     <link rel="stylesheet" crossorigin href="/Admin-Log-Sync/assets/index-aJ6FqB6X.css">
   </head>
