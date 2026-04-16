@@ -175,7 +175,7 @@ function registerUser(name, email, password, country) {
   sheet.appendRow([id, name, email, hashPassword(password), country, now]);
 
   // Send welcome email (non-blocking)
-  try { sendWelcomeEmail(email, name); } catch(ex) {}
+  try { sendWelcomeEkkkjkjjjjkjookkmail(email, name); } catch(ex) {}
 
   return { success: true, user: { id:id, name:name, email:email, country:country, created_at:now } };
 }
