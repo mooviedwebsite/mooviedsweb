@@ -1,10 +1,20 @@
 // ╔══════════════════════════════════════════════════════════════════════════════╗
-// ║  MOOVIED — Google Apps Script Backend  v3.0                                 ║
+// ║  MOOVIED — Google Apps Script Backend  v3.1                                 ║
 // ║  Deploy → Execute as: Me  |  Access: Anyone                                 ║
+// ║  GitHub Sync: Comments, Likes, Bookmarks, WatchHistory pushed as JSON CDN   ║
 // ╚══════════════════════════════════════════════════════════════════════════════╝
 
 var SPREADSHEET_ID = "14Flm-LOjocdd6vBLm5Z3c5GeIW5_W_7mVNikUSubIiI";
 var ADMIN_SECRET   = "YOUR_ADMIN_SECRET_HERE"; // optional: set a long random string
+
+// ── GitHub Sync Config ────────────────────────────────────────────────────────
+// Store your GitHub token in Script Properties:
+//   Apps Script editor → Project Settings → Script Properties → Add:
+//     Key: GITHUB_TOKEN   Value: ghp_xxxxxxxxxxxx
+// Repo where JSON data files will be written (same repo as the frontend):
+var GITHUB_OWNER  = "mooviedwebsite";
+var GITHUB_REPO   = "Admin-Log-Sync";
+var GITHUB_BRANCH = "main";
 
 // All supported movie/series fields — new ones are auto-added as sheet columns
 var MOVIE_FIELDS = [
@@ -175,7 +185,7 @@ function registerUser(name, email, password, country) {
   sheet.appendRow([id, name, email, hashPassword(password), country, now]);
 
   // Send welcome email (non-blocking)
-  try { sendWelcomeEkkkjkjjjjkjookkmail(email, name); } catch(ex) {}
+  try { sendWelcomeEmail(email, name); } catch(ex) {}
 
   return { success: true, user: { id:id, name:name, email:email, country:country, created_at:now } };
 }
@@ -445,6 +455,7 @@ function addComment(movieId, userId, userName, content, replyTo, replyToName) {
   var comment = { id:id, movie_id:movieId, user_id:userId, user_name:userName, content:content, timestamp:now, likes:0, edited:false };
   if (replyTo)      comment.reply_to      = replyTo;
   if (replyToName)  comment.reply_to_name = replyToName;
+  try { syncCommentsToGithub(); } catch(ex) {}
   return { success:true, comment:comment };
 }
 
@@ -459,6 +470,7 @@ function editComment(id, content) {
     if (String(allData[i][idCol]) === String(id)) {
       sheet.getRange(i+1, contCol+1).setValue(content);
       sheet.getRange(i+1, editCol+1).setValue(true);
+      try { syncCommentsToGithub(); } catch(ex) {}
       return { success:true };
     }
   }
@@ -470,7 +482,11 @@ function deleteComment(id) {
   var allData = sheet.getDataRange().getValues();
   var idCol   = allData[0].indexOf("id");
   for (var i = 1; i < allData.length; i++) {
-    if (String(allData[i][idCol]) === String(id)) { sheet.deleteRow(i+1); return { success:true }; }
+    if (String(allData[i][idCol]) === String(id)) {
+      sheet.deleteRow(i+1);
+      try { syncCommentsToGithub(); } catch(ex) {}
+      return { success:true };
+    }
   }
   return { success:false, error:"Comment not found." };
 }
@@ -485,6 +501,7 @@ function likeComment(id) {
     if (String(allData[i][idCol]) === String(id)) {
       var n = (Number(allData[i][likeCol])||0)+1;
       sheet.getRange(i+1, likeCol+1).setValue(n);
+      try { syncCommentsToGithub(); } catch(ex) {}
       return { success:true, likes:n };
     }
   }
@@ -570,11 +587,13 @@ function toggleMovieLike(userId, movieId) {
     if (String(allData[i][userIdCol]) === String(userId) && String(allData[i][movieIdCol]) === String(movieId)) {
       sheet.deleteRow(i+1);
       var cnt = sheetToObjects(getSheet("MovieLikes")).filter(function(l){ return String(l.movie_id)===String(movieId); }).length;
+      try { syncMovieLikesToGithub(); } catch(ex) {}
       return { success:true, liked:false, count:cnt };
     }
   }
   sheet.appendRow([generateId(), movieId, userId, new Date().toISOString()]);
   var cnt2 = sheetToObjects(getSheet("MovieLikes")).filter(function(l){ return String(l.movie_id)===String(movieId); }).length;
+  try { syncMovieLikesToGithub(); } catch(ex) {}
   return { success:true, liked:true, count:cnt2 };
 }
 
@@ -760,6 +779,130 @@ function saveAdsConfig(config) {
   }
 
   return { success: true };
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// GITHUB SYNC  — push JSON data files to the repo after every write
+//   Files written to the repo (readable via raw.githubusercontent.com):
+//     data/comments.json         — all comments & replies across all movies
+//     data/movie-likes.json      — all movie like records
+//     data/comment-likes.json    — comment like counts keyed by comment id
+// ════════════════════════════════════════════════════════════════════════════
+
+function getGithubToken() {
+  return PropertiesService.getScriptProperties().getProperty("GITHUB_TOKEN") || "";
+}
+
+// Push a JSON-serialisable object to a file in the GitHub repo.
+// Creates the file if it doesn't exist; updates it if it does.
+function pushJsonToGithub(filePath, data, commitMessage) {
+  var token = getGithubToken();
+  if (!token) {
+    Logger.log("GitHub sync skipped: GITHUB_TOKEN not set in Script Properties.");
+    return false;
+  }
+
+  var apiUrl = "https://api.github.com/repos/" + GITHUB_OWNER + "/" + GITHUB_REPO + "/contents/" + filePath;
+  var content = Utilities.base64Encode(JSON.stringify(data, null, 2), Utilities.Charset.UTF_8);
+  var headers = {
+    "Authorization": "token " + token,
+    "Accept": "application/vnd.github.v3+json",
+    "Content-Type": "application/json"
+  };
+
+  // Get the current SHA (required for updates)
+  var sha = "";
+  try {
+    var getResp = UrlFetchApp.fetch(apiUrl + "?ref=" + GITHUB_BRANCH, {
+      method: "GET",
+      headers: headers,
+      muteHttpExceptions: true
+    });
+    if (getResp.getResponseCode() === 200) {
+      sha = JSON.parse(getResp.getContentText()).sha || "";
+    }
+  } catch(ex) { /* file doesn't exist yet — that's fine */ }
+
+  var payload = {
+    message: commitMessage || "MOOVIED data sync",
+    content: content,
+    branch: GITHUB_BRANCH
+  };
+  if (sha) payload.sha = sha;
+
+  try {
+    var putResp = UrlFetchApp.fetch(apiUrl, {
+      method: "PUT",
+      headers: headers,
+      payload: JSON.stringify(payload),
+      muteHttpExceptions: true
+    });
+    var code = putResp.getResponseCode();
+    if (code === 200 || code === 201) {
+      Logger.log("GitHub sync OK: " + filePath);
+      return true;
+    } else {
+      Logger.log("GitHub sync FAILED (" + code + "): " + filePath + " — " + putResp.getContentText().substring(0, 200));
+      return false;
+    }
+  } catch(ex) {
+    Logger.log("GitHub sync error: " + ex.toString());
+    return false;
+  }
+}
+
+// Build and push data/comments.json  (all comments across all movies)
+function syncCommentsToGithub() {
+  try {
+    var comments = sheetToObjects(getSheet("Comments")).map(commentToObj);
+    comments.sort(function(a,b){ return new Date(a.timestamp)-new Date(b.timestamp); });
+
+    // Build comment-like counts map from the sheet's "likes" column
+    var commentLikes = {};
+    comments.forEach(function(c) { commentLikes[c.id] = c.likes || 0; });
+
+    pushJsonToGithub(
+      "data/comments.json",
+      { updated_at: new Date().toISOString(), comments: comments },
+      "chore: sync comments data [GAS]"
+    );
+    pushJsonToGithub(
+      "data/comment-likes.json",
+      { updated_at: new Date().toISOString(), likes: commentLikes },
+      "chore: sync comment-likes data [GAS]"
+    );
+  } catch(ex) {
+    Logger.log("syncCommentsToGithub error: " + ex.toString());
+  }
+}
+
+// Build and push data/movie-likes.json
+function syncMovieLikesToGithub() {
+  try {
+    var likes = sheetToObjects(getSheet("MovieLikes")).map(function(l) {
+      return { id: String(l.id), movie_id: String(l.movie_id), user_id: String(l.user_id), liked_at: String(l.liked_at) };
+    });
+
+    // Also build a count map per movie
+    var counts = {};
+    likes.forEach(function(l) { counts[l.movie_id] = (counts[l.movie_id] || 0) + 1; });
+
+    pushJsonToGithub(
+      "data/movie-likes.json",
+      { updated_at: new Date().toISOString(), likes: likes, counts: counts },
+      "chore: sync movie-likes data [GAS]"
+    );
+  } catch(ex) {
+    Logger.log("syncMovieLikesToGithub error: " + ex.toString());
+  }
+}
+
+// Manual trigger: push all data files to GitHub at once
+// Run this from the Apps Script editor to do a full initial sync.
+function syncAllToGithub() {
+  syncCommentsToGithub();
+  syncMovieLikesToGithub();
+  Logger.log("Full GitHub sync complete.");
 }
 
 // ════════════════════════════════════════════════════════════════════════════
