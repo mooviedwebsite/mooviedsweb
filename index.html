@@ -16,23 +16,43 @@
     <link rel="dns-prefetch" href="https://script.google.com">
     <link rel="preconnect" href="https://script.googleusercontent.com">
     <link rel="dns-prefetch" href="https://script.googleusercontent.com">
-    <link rel="dns-prefetch" href="https://raw.githubusercontent.com">
 
-    <!-- MOOVIED API — sets correct URLs before React loads -->
     <script>
     (function () {
-      var GAS = 'https://script.google.com/macros/s/AKfycbwMcrOMCPmRMgbWunm0eQnweODbktt_6yvv8oKR8p61_n4ULAsuCD2wBtokaNPN4VyT/exec';
-      var API = window.location.origin + '/api';
-      localStorage.setItem('moovied_comments_api_url', API);
-      localStorage.setItem('moovied_api_server_url',   API);
-      localStorage.setItem('moovied_gas_url',           GAS);
-      var _g = Storage.prototype.getItem;
-      Storage.prototype.getItem = function (k) {
-        if (k === 'moovied_comments_api_url') return API;
-        if (k === 'moovied_api_server_url')   return API;
-        if (k === 'moovied_gas_url')          return GAS;
-        return _g.call(this, k);
-      };
+      var GAS  = 'https://script.google.com/macros/s/AKfycbwMcrOMCPmRMgbWunm0eQnweODbktt_6yvv8oKR8p61_n4ULAsuCD2wBtokaNPN4VyT/exec';
+      var API  = window.location.origin + '/api';
+      var DEAD = 'https://a16cbf22-021e-4fbd-a6d1-5c8d3c7e4244-00-923mtzjoxrcz.worf.replit.dev/api';
+
+      /* 1. Set localStorage so ts() reads our server URL */
+      try {
+        localStorage.setItem('moovied_comments_api_url', API);
+        localStorage.setItem('moovied_api_server_url',   API);
+        localStorage.setItem('moovied_gas_url',           GAS);
+      } catch(e) {}
+
+      /* 2. Override Storage.prototype.getItem as extra safety */
+      try {
+        var _g = Storage.prototype.getItem;
+        Storage.prototype.getItem = function (k) {
+          if (k === 'moovied_comments_api_url') return API;
+          if (k === 'moovied_api_server_url')   return API;
+          if (k === 'moovied_gas_url')           return GAS;
+          return _g.call(this, k);
+        };
+      } catch(e) {}
+
+      /* 3. Nuclear fix: intercept window.fetch to rewrite the dead URL.
+            Even if ts() returns the old dead URL, this catch-all rewrites it.
+            The "GAS not connected" banner CANNOT appear. */
+      try {
+        var _f = window.fetch.bind(window);
+        window.fetch = function (u, o) {
+          if (typeof u === 'string' && u.startsWith(DEAD)) {
+            u = API + u.slice(DEAD.length);
+          }
+          return _f(u, o);
+        };
+      } catch(e) {}
     })();
     </script>
 
