@@ -1,1 +1,24 @@
-[]
+[
+  {
+    "id": "85a8ba20-f4d2-42f7-bf3e-2136ad52e496",
+    "movie_id": "movie-test-1",
+    "user_id": "user-123",
+    "user_name": "TestUser",
+    "content": "This is a great movie!",
+    "timestamp": "2026-04-16T12:51:30.915Z",
+    "likes": 0,
+    "edited": false
+  },
+  {
+    "id": "2a7431dd-d95f-4e19-b6fe-0d024d8c7345",
+    "movie_id": "avengers-2025",
+    "user_id": "uid-abc",
+    "user_name": "Rawnidu",
+    "content": "Amazing movie! Must watch.",
+    "timestamp": "2026-04-16T13:02:06.509Z",
+    "likes": 0,
+    "edited": false,
+    "reply_to": "",
+    "reply_to_name": ""
+  }
+]
