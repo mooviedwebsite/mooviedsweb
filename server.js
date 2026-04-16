@@ -174,10 +174,18 @@ function gasPost(body) {
     },
     body: jsonBody,
   }).then(r => {
-    console.log(`[GAS] ${body.action} → HTTP ${r.status}`);
+    console.log(`[GAS POST] ${body.action} → HTTP ${r.status}`);
   }).catch(e => {
-    console.log(`[GAS] ${body.action} error: ${e.message}`);
+    console.log(`[GAS POST] ${body.action} error: ${e.message}`);
   });
+}
+
+// Fire-and-forget GET to GAS — uses doGet directly (no redirect issues)
+// This is the RELIABLE path for syncing comment mutations to the sheet
+function gasSync(action, params = {}) {
+  gasGet(action, params)
+    .then(r => console.log(`[GAS GET] ${action} → success:${r.success}${r.error ? ' err:' + r.error : ''}`))
+    .catch(e => console.log(`[GAS GET] ${action} error: ${e.message}`));
 }
 
 // ── GitHub push helper ────────────────────────────────────────────────────────
@@ -336,8 +344,9 @@ async function handleApi(req, res, apiPath) {
     all.push(comment);
     writeComments(all);
 
-    // Async: tell GAS to save it too (fire-and-forget)
-    gasPost({ action: 'addComment', movieId, userId, userName, content, reply_to: replyTo, reply_to_name: replyToName });
+    // Async: POST to GAS (triggers doPost, data saved to sheet)
+    // id is passed so GAS uses the same UUID as local (requires code.gs v4.1+)
+    gasPost({ action: 'addComment', id: comment.id, movieId, userId, userName, content, reply_to: replyTo, reply_to_name: replyToName });
 
     // Async: push updated comments.json to GitHub
     syncCommentsToGithub(all);
