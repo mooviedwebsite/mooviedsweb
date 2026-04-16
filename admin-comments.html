@@ -299,6 +299,7 @@ a{color:inherit;text-decoration:none}
   <div class="login-card">
     <div class="login-logo">MOOV<span>IED</span></div>
     <div class="login-sub">Admin Comments Panel — sign in to continue</div>
+    <form onsubmit="doLogin();return false;">
     <div class="field">
       <label>Email</label>
       <input type="email" id="login-email" placeholder="admin@email.com" autocomplete="email"/>
@@ -307,7 +308,8 @@ a{color:inherit;text-decoration:none}
       <label>Password</label>
       <input type="password" id="login-pass" placeholder="••••••••" autocomplete="current-password"/>
     </div>
-    <button class="btn-primary" id="login-btn" onclick="doLogin()">Sign In</button>
+    <button type="submit" class="btn-primary" id="login-btn">Sign In</button>
+    </form>
     <div id="login-error"></div>
   </div>
 </div>
@@ -506,9 +508,6 @@ function logout() {
 
 // ── Boot ──────────────────────────────────────────────────────────────────────
 window.addEventListener("DOMContentLoaded", async () => {
-  // Enter key on login
-  document.getElementById("login-pass").addEventListener("keydown", e => { if (e.key === "Enter") doLogin(); });
-  document.getElementById("login-email").addEventListener("keydown", e => { if (e.key === "Enter") doLogin(); });
 
   const saved = localStorage.getItem(STORAGE_KEY);
   if (saved) {
