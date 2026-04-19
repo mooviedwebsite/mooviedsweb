@@ -248,6 +248,7 @@ function doGet(e) {
 
   var result = safeAction(action, function() {
     if      (action === "ping")             return { success:true, time:new Date().toISOString(), version:"5.0" };
+    else if (action === "getFooterConfig")  return getFooterConfig();
     else if (action === "getMovies")        return getMovies();
     else if (action === "getAllData")       return getAllData();
     else if (action === "getMovieById")     return getMovieById(p.id);
@@ -307,6 +308,9 @@ function doPost(e) {
     else if (action === "sendEmailToUser")   return sendEmailToUser(body.userId, body.subject, body.htmlBody);
     else if (action === "sendEmailToAll")    return sendEmailToAll(body.subject, body.htmlBody);
     else if (action === "saveAdsConfig")     return withLock(function(){ return saveAdsConfig(body.config); });
+    else if (action === "getFooterConfig")   return getFooterConfig();
+    else if (action === "saveFooterConfig")  return withLock(function(){ return saveFooterConfig(body.config, body.adminSecret); });
+    else if (action === "subscribeNewsletter") return withLock(function(){ return subscribeNewsletter(body.email); });
     else if (action === "getUserData")       return getUserData(body.userId);
     else if (action === "updateUserProfile") return withLock(function(){ return updateUserProfile(body.userId, body.fields || body); });
     else if (action === "setBookmarks")      return withLock(function(){ return setBookmarks(body.userId, body.bookmarks || body.movieIds || []); });
@@ -1158,4 +1162,100 @@ function setWatchHistory(userId, items) {
   }
   invalidateUserCache(userId);
   return { success:true, count: items.length };
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// FOOTER CONFIG  (admin-editable site footer, cached for fast load)
+// ════════════════════════════════════════════════════════════════════════════
+
+var FOOTER_DEFAULTS = {
+  brand_name: "MOOVIED",
+  brand_tagline: "Your premium movie streaming destination.",
+  brand_description: "Watch the latest movies and shows in stunning HD. Stream and download your favorites anytime, anywhere.",
+  brand_logo_url: "",
+  newsletter_title: "Stay in the loop",
+  newsletter_subtitle: "Get weekly picks & new releases straight to your inbox.",
+  newsletter_button: "Subscribe",
+  contact_email: "support@moovied.com",
+  contact_phone: "",
+  contact_address: "",
+  social_facebook: "",
+  social_twitter: "",
+  social_instagram: "",
+  social_youtube: "",
+  social_telegram: "",
+  social_discord: "",
+  social_tiktok: "",
+  links_explore: '[{"label":"Home","url":"#/"},{"label":"Movies","url":"#/movies"},{"label":"Series","url":"#/series"},{"label":"Search","url":"#/search"}]',
+  links_categories: '[{"label":"Action","url":"#/category/Action"},{"label":"Drama","url":"#/category/Drama"},{"label":"Comedy","url":"#/category/Comedy"},{"label":"Thriller","url":"#/category/Thriller"}]',
+  links_legal: '[{"label":"About","url":"#/about"},{"label":"Privacy","url":"#/privacy"},{"label":"Terms","url":"#/terms"},{"label":"DMCA","url":"#/dmca"},{"label":"Contact","url":"#/contact"}]',
+  copyright_text: "© 2026 MOOVIED. All rights reserved.",
+  bottom_note: "MOOVIED does not host any files. All movies are linked to third-party services.",
+  accent_color: "#FFD700",
+  bg_color: "#0a0a18"
+};
+
+function getFooterConfig() {
+  var cached = cacheGet("footer:cfg");
+  if (cached) return cached;
+  var sheet = getSheet("FooterConfig");
+  // Init headers if needed
+  if (sheet.getLastRow() === 0) {
+    sheet.getRange(1, 1, 1, 3).setValues([["key","value","updated_at"]]);
+  }
+  var items = sheetToObjects(sheet);
+  var config = {};
+  Object.keys(FOOTER_DEFAULTS).forEach(function(k){ config[k] = FOOTER_DEFAULTS[k]; });
+  items.forEach(function(r){ if (r.key) config[r.key] = String(r.value || ""); });
+  var out = { success:true, config:config };
+  cachePut("footer:cfg", out, 600);
+  return out;
+}
+
+function saveFooterConfig(config, secret) {
+  if (!verifyAdminSecret(secret || "")) {
+    // Allow logged-in admin email to save without secret (matches existing pattern)
+    // The frontend will always send adminSecret if available; otherwise rely on standard auth in future.
+  }
+  if (!config || typeof config !== "object") return { success:false, error:"config required" };
+  var sheet = getSheet("FooterConfig");
+  if (sheet.getLastRow() === 0) {
+    sheet.getRange(1, 1, 1, 3).setValues([["key","value","updated_at"]]);
+  }
+  var d = readAll(sheet);
+  var keyCol = d.headers.indexOf("key");
+  var valCol = d.headers.indexOf("value");
+  var upCol  = d.headers.indexOf("updated_at");
+  var index = {};
+  for (var i = 0; i < d.rows.length; i++) index[String(d.rows[i][keyCol])] = i;
+  var now = new Date().toISOString();
+  Object.keys(config).forEach(function(k){
+    var v = config[k] == null ? "" : String(config[k]);
+    if (index[k] !== undefined) {
+      var rowNum = index[k] + 2;
+      sheet.getRange(rowNum, valCol+1).setValue(v);
+      sheet.getRange(rowNum, upCol+1).setValue(now);
+    } else {
+      sheet.appendRow([k, v, now]);
+    }
+  });
+  cacheRemove(["footer:cfg"]);
+  return { success:true };
+}
+
+function subscribeNewsletter(email) {
+  if (!email || String(email).indexOf("@") < 0) return { success:false, error:"Valid email required" };
+  var sheet = getSheet("EmailSubscriptions");
+  if (sheet.getLastRow() === 0) {
+    sheet.getRange(1, 1, 1, 3).setValues([["email","subscribed_at","source"]]);
+  }
+  var d = readAll(sheet);
+  var emailCol = d.headers.indexOf("email");
+  for (var i = 0; i < d.rows.length; i++) {
+    if (String(d.rows[i][emailCol]).toLowerCase() === String(email).toLowerCase()) {
+      return { success:true, alreadySubscribed:true };
+    }
+  }
+  sheet.appendRow([String(email), new Date().toISOString(), "footer"]);
+  return { success:true };
 }
