@@ -262,7 +262,7 @@
   }
 
   // Footer is shown ONLY on these app routes (after stripping the GitHub Pages basename)
-  var ALLOWED = ["/", "/movies", "/search", "/profile"];
+  var ALLOWED = ["/", "/movies", "/movie", "/search", "/profile"];
   function currentRoute(){
     try {
       var p = location.pathname || "/";
