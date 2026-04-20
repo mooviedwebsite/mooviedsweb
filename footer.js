@@ -261,7 +261,29 @@
     });
   }
 
+  function isAdminRoute(){
+    try {
+      var p = (location.pathname || "") + (location.hash || "");
+      return /\/admin(\b|\/|$|\?|#)/i.test(p) || /#\/?admin/i.test(p);
+    } catch(e){ return false; }
+  }
+  function applyRouteVisibility(){
+    var el = document.getElementById("mv-footer");
+    if (el) el.style.display = isAdminRoute() ? "none" : "";
+  }
+  function watchRoute(){
+    window.addEventListener("popstate", applyRouteVisibility);
+    window.addEventListener("hashchange", applyRouteVisibility);
+    try {
+      var ps = history.pushState, rs = history.replaceState;
+      history.pushState = function(){ var r = ps.apply(this, arguments); setTimeout(applyRouteVisibility, 0); return r; };
+      history.replaceState = function(){ var r = rs.apply(this, arguments); setTimeout(applyRouteVisibility, 0); return r; };
+    } catch(e){}
+  }
+
   function init(){
+    if (isAdminRoute()) { watchRoute(); return; }
+    watchRoute();
     // Render with cached or defaults FIRST (instant paint)
     var cached = getCachedConfig();
     render(cached || DEFAULTS);
