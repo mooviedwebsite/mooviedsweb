@@ -103,7 +103,6 @@
     if (cfg.contact_address) contact += '<span>📍 '+escHTML(cfg.contact_address)+'</span>';
 
     f.innerHTML =
-      (isAdmin() ? '<button type="button" class="mv-foot-edit" id="mv-foot-edit-btn">✎ Edit Footer</button>' : '') +
       '<div class="mv-footer-grid">'+
         '<div class="mv-foot-brand">'+
           '<div class="mv-foot-logo">'+brandLogo+'<span>'+escHTML(cfg.brand_name||"MOOVIED")+'</span></div>'+
@@ -160,9 +159,40 @@
       }).finally(function(){ btn.disabled=false; });
     });
 
-    // Wire admin edit
-    var editBtn = document.getElementById("mv-foot-edit-btn");
-    if (editBtn) editBtn.addEventListener("click", function(){ openEditor(cfg); });
+  }
+
+  // ===== Admin sidebar injector =====
+  // Adds a "Footer" nav button into the React-rendered admin panel sidebar.
+  // Clicking it opens the same edit modal used previously.
+  function injectAdminButton(){
+    if (!isAdmin()) return;
+    if (currentRoute().toLowerCase().indexOf("/admin") !== 0) return;
+    if (document.getElementById("mv-admin-footer-btn")) return;
+
+    // Find the admin sidebar nav (matches the bundle's classes: "flex-1 p-4 space-y-1")
+    var navs = document.querySelectorAll("nav.flex-1.p-4.space-y-1, nav[class*='flex-1'][class*='space-y-1']");
+    if (!navs || !navs.length) return;
+    var nav = navs[navs.length - 1];
+
+    // Mimic the existing button styles
+    var btn = document.createElement("button");
+    btn.id = "mv-admin-footer-btn";
+    btn.type = "button";
+    btn.className = "w-full flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm transition-all text-white/60 hover:bg-white/5 hover:text-white";
+    btn.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="15" x2="21" y2="15"/><line x1="9" y1="15" x2="9" y2="21"/></svg> Footer Settings';
+    btn.addEventListener("click", function(e){
+      e.preventDefault(); e.stopPropagation();
+      var cfg = getCachedConfig() || DEFAULTS;
+      // Fetch fresh first so admin sees latest values
+      fetchConfig().then(function(c){ openEditor(c || cfg); }).catch(function(){ openEditor(cfg); });
+    });
+    nav.appendChild(btn);
+  }
+  function watchAdminSidebar(){
+    var run = function(){ try { injectAdminButton(); } catch(e){} };
+    run();
+    var mo = new MutationObserver(run);
+    mo.observe(document.body, {childList:true, subtree:true});
   }
 
   function openEditor(cfg){
@@ -302,6 +332,7 @@
 
   function init(){
     watchRoute();
+    watchAdminSidebar();
     // Always render so SPA navigation can simply toggle visibility
     var cached = getCachedConfig();
     render(cached || DEFAULTS);
