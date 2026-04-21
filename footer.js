@@ -188,8 +188,127 @@
     });
     nav.appendChild(btn);
   }
+  // ===== Admin GitHub Sync button =====
+  function injectGithubButton(){
+    if (!isAdmin()) return;
+    if (currentRoute().toLowerCase().indexOf("/admin") !== 0) return;
+    if (document.getElementById("mv-admin-gh-btn")) return;
+
+    var navs = document.querySelectorAll("nav.flex-1.p-4.space-y-1, nav[class*='flex-1'][class*='space-y-1']");
+    if (!navs || !navs.length) return;
+    var nav = navs[navs.length - 1];
+
+    var btn = document.createElement("button");
+    btn.id = "mv-admin-gh-btn";
+    btn.type = "button";
+    btn.className = "w-full flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm transition-all text-white/60 hover:bg-white/5 hover:text-white";
+    btn.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 .5C5.65.5.5 5.65.5 12c0 5.08 3.29 9.39 7.86 10.91.58.11.79-.25.79-.56v-2c-3.2.7-3.87-1.36-3.87-1.36-.52-1.32-1.27-1.67-1.27-1.67-1.04-.71.08-.7.08-.7 1.15.08 1.76 1.18 1.76 1.18 1.02 1.75 2.68 1.24 3.34.95.1-.74.4-1.24.72-1.53-2.55-.29-5.24-1.27-5.24-5.67 0-1.25.45-2.27 1.18-3.07-.12-.29-.51-1.46.11-3.04 0 0 .96-.31 3.15 1.17a10.93 10.93 0 0 1 5.74 0c2.19-1.48 3.15-1.17 3.15-1.17.62 1.58.23 2.75.11 3.04.74.8 1.18 1.82 1.18 3.07 0 4.41-2.69 5.38-5.25 5.66.41.36.78 1.05.78 2.12v3.14c0 .31.21.68.8.56 4.56-1.52 7.85-5.83 7.85-10.9C23.5 5.65 18.35.5 12 .5z"/></svg> GitHub Sync';
+    btn.addEventListener("click", function(e){
+      e.preventDefault(); e.stopPropagation();
+      openGithubEditor();
+    });
+    nav.appendChild(btn);
+  }
+
+  function openGithubEditor(){
+    var existing = document.getElementById("mv-gh-modal"); if (existing) existing.remove();
+    var modal = document.createElement("div");
+    modal.id = "mv-gh-modal";
+    modal.className = "mv-foot-modal";
+    modal.innerHTML =
+      '<div class="mv-foot-modal-box" style="max-width:560px">'+
+        '<div class="mv-foot-modal-head"><h3>GitHub Sync</h3><button type="button" id="mv-gh-close">×</button></div>'+
+        '<div class="mv-foot-modal-body">'+
+          '<div class="mv-mod-section">'+
+            '<h5>Repository</h5>'+
+            '<div id="mv-gh-repo" style="color:rgba(255,255,255,.6);font-size:13px;line-height:1.6">Loading…</div>'+
+          '</div>'+
+          '<div class="mv-mod-section">'+
+            '<h5>Personal Access Token</h5>'+
+            '<div id="mv-gh-status" style="margin-bottom:8px;font-size:12.5px;color:rgba(255,255,255,.55)">Checking status…</div>'+
+            '<label>New token (paste a fine-grained PAT with Contents: Read &amp; Write)</label>'+
+            '<input type="password" id="mv-gh-token-input" autocomplete="off" placeholder="ghp_… or github_pat_…" style="font-family:ui-monospace,Menlo,Consolas,monospace">'+
+            '<div style="margin-top:6px;font-size:11.5px;color:rgba(255,255,255,.4)">The token is stored securely as a Script Property and never returned to the browser. We only show a masked preview.</div>'+
+            '<div id="mv-gh-msg" class="mv-foot-msg" style="margin-top:10px"></div>'+
+          '</div>'+
+        '</div>'+
+        '<div class="mv-foot-modal-foot">'+
+          '<button type="button" id="mv-gh-clear" class="mv-btn-cancel">Clear Token</button>'+
+          '<button type="button" id="mv-gh-save" class="mv-btn-save">Save &amp; Verify</button>'+
+        '</div>'+
+      '</div>';
+    document.body.appendChild(modal);
+
+    function close(){ modal.remove(); }
+    document.getElementById("mv-gh-close").addEventListener("click", close);
+    modal.addEventListener("click", function(e){ if (e.target === modal) close(); });
+
+    var msgEl = document.getElementById("mv-gh-msg");
+    function setMsg(text, isErr){
+      msgEl.className = "mv-foot-msg" + (isErr ? " err" : "");
+      msgEl.textContent = text || "";
+    }
+
+    function refreshStatus(){
+      var sec = (getSession()||{}).adminSecret || "";
+      fetch(GAS_URL + "?action=getGithubTokenStatus" + (sec ? "&adminSecret="+encodeURIComponent(sec) : ""))
+        .then(function(r){ return r.json(); })
+        .then(function(j){
+          if (!j || !j.success) {
+            document.getElementById("mv-gh-status").textContent = "Could not load status: " + ((j&&j.error)||"unknown");
+            document.getElementById("mv-gh-repo").textContent   = "—";
+            return;
+          }
+          document.getElementById("mv-gh-repo").innerHTML =
+            '<div><strong>'+escHTML(j.owner||"?")+' / '+escHTML(j.repo||"?")+'</strong></div>'+
+            '<div style="color:rgba(255,255,255,.4);font-size:12px">Branch: '+escHTML(j.branch||"main")+'</div>';
+          if (j.hasToken) {
+            document.getElementById("mv-gh-status").innerHTML =
+              '<span style="color:#4ade80">●</span> Token configured: <code style="font-family:ui-monospace,Menlo,Consolas,monospace;background:rgba(255,255,255,.06);padding:2px 6px;border-radius:6px">'+escHTML(j.masked||"")+'</code>';
+          } else {
+            document.getElementById("mv-gh-status").innerHTML =
+              '<span style="color:#f87171">●</span> No token saved. Movie sync to GitHub posts is disabled.';
+          }
+        })
+        .catch(function(){ document.getElementById("mv-gh-status").textContent = "Network error loading status."; });
+    }
+    refreshStatus();
+
+    document.getElementById("mv-gh-save").addEventListener("click", function(){
+      var inp = document.getElementById("mv-gh-token-input");
+      var t = (inp.value || "").trim();
+      if (!t) { setMsg("Please paste a token first.", true); return; }
+      var btn = this; btn.disabled = true; setMsg("Saving & verifying with GitHub…");
+      var sec = (getSession()||{}).adminSecret || "";
+      postAction("saveGithubToken", { token:t, adminSecret:sec }).then(function(r){
+        if (r && r.success) {
+          setMsg(r.message || "Saved.");
+          inp.value = "";
+          refreshStatus();
+        } else {
+          setMsg((r && r.error) || "Save failed.", true);
+        }
+      }).catch(function(){ setMsg("Network error.", true); })
+        .finally(function(){ btn.disabled = false; });
+    });
+
+    document.getElementById("mv-gh-clear").addEventListener("click", function(){
+      if (!confirm("Clear the saved GitHub token? Movie/series files will no longer auto-push to GitHub.")) return;
+      var btn = this; btn.disabled = true; setMsg("Clearing…");
+      var sec = (getSession()||{}).adminSecret || "";
+      postAction("clearGithubToken", { adminSecret:sec }).then(function(r){
+        if (r && r.success) { setMsg(r.message || "Cleared."); refreshStatus(); }
+        else setMsg((r && r.error) || "Clear failed.", true);
+      }).catch(function(){ setMsg("Network error.", true); })
+        .finally(function(){ btn.disabled = false; });
+    });
+  }
+
   function watchAdminSidebar(){
-    var run = function(){ try { injectAdminButton(); } catch(e){} };
+    var run = function(){
+      try { injectAdminButton(); } catch(e){}
+      try { injectGithubButton(); } catch(e){}
+    };
     run();
     var mo = new MutationObserver(run);
     mo.observe(document.body, {childList:true, subtree:true});
