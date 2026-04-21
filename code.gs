@@ -36,7 +36,8 @@ var COMMENT_FIELDS = ["id","movie_id","user_id","user_name","content","timestamp
 var ADMIN_ACTIONS = [
   "addMovie","editMovie","deleteMovie","getUsers","deleteUser",
   "getActivityLogs","getStats","logActivity","sendEmailToUser","sendEmailToAll",
-  "resetCommentsSheet","clearAllComments"
+  "resetCommentsSheet","clearAllComments",
+  "getGithubTokenStatus","saveGithubToken","clearGithubToken"
 ];
 
 // ── Cache TTLs (seconds) ──────────────────────────────────────────────────────
@@ -256,6 +257,7 @@ function doGet(e) {
     else if (action === "getStats")         return getStats();
     else if (action === "getActivityLogs")  return getActivityLogs();
     else if (action === "getComments")      return getComments(p.movieId);
+    else if (action === "getGithubTokenStatus") return getGithubTokenStatus();
     else if (action === "getAllComments")   return getAllComments();
     else if (action === "getWatchHistory")  return getWatchHistory(p.userId);
     else if (action === "getBookmarks")     return getBookmarks(p.userId);
@@ -310,6 +312,9 @@ function doPost(e) {
     else if (action === "saveAdsConfig")     return withLock(function(){ return saveAdsConfig(body.config); });
     else if (action === "getFooterConfig")   return getFooterConfig();
     else if (action === "saveFooterConfig")  return withLock(function(){ return saveFooterConfig(body.config, body.adminSecret); });
+    else if (action === "getGithubTokenStatus") return getGithubTokenStatus();
+    else if (action === "saveGithubToken")   return withLock(function(){ return saveGithubToken(body.token); });
+    else if (action === "clearGithubToken")  return withLock(function(){ return clearGithubToken(); });
     else if (action === "subscribeNewsletter") return withLock(function(){ return subscribeNewsletter(body.email); });
     else if (action === "getUserData")       return getUserData(body.userId);
     else if (action === "updateUserProfile") return withLock(function(){ return updateUserProfile(body.userId, body.fields || body); });
@@ -976,6 +981,54 @@ function sendEmailToAll(subject, htmlBody) {
 function getGithubToken() {
   try { return PropertiesService.getScriptProperties().getProperty("GITHUB_TOKEN") || ""; }
   catch(ex) { return ""; }
+}
+
+function maskGithubToken(t) {
+  if (!t) return "";
+  var s = String(t);
+  if (s.length <= 10) return s.charAt(0) + "•••••" + s.charAt(s.length-1);
+  return s.substring(0,4) + "•••••••••••••••••" + s.substring(s.length-4);
+}
+
+function getGithubTokenStatus() {
+  var t = getGithubToken();
+  return {
+    success: true,
+    hasToken: !!t,
+    masked: maskGithubToken(t),
+    owner: typeof GITHUB_OWNER === "string" ? GITHUB_OWNER : "",
+    repo:  typeof GITHUB_REPO  === "string" ? GITHUB_REPO  : "",
+    branch:typeof GITHUB_BRANCH=== "string" ? GITHUB_BRANCH: ""
+  };
+}
+
+function saveGithubToken(token) {
+  var t = String(token||"").trim();
+  if (!t) return { success:false, error:"Token is empty." };
+  // Basic shape check — GitHub PATs commonly start with ghp_, github_pat_, or gho_
+  if (!/^(ghp_|gho_|github_pat_)[A-Za-z0-9_]{20,}$/.test(t)) {
+    return { success:false, error:"Token format looks invalid. Use a GitHub PAT (ghp_… or github_pat_…)." };
+  }
+  // Verify against GitHub by fetching the repo
+  try {
+    var resp = UrlFetchApp.fetch(
+      "https://api.github.com/repos/" + GITHUB_OWNER + "/" + GITHUB_REPO,
+      { headers: { Authorization:"token "+t, Accept:"application/vnd.github.v3+json" }, muteHttpExceptions:true }
+    );
+    var code = resp.getResponseCode();
+    if (code === 401 || code === 403) return { success:false, error:"GitHub rejected the token (unauthorized)." };
+    if (code === 404) return { success:false, error:"Repo "+GITHUB_OWNER+"/"+GITHUB_REPO+" not found or token lacks access." };
+    if (code >= 400) return { success:false, error:"GitHub error: HTTP "+code };
+  } catch(ex) {
+    return { success:false, error:"Verify failed: "+(ex && ex.message ? ex.message : ex) };
+  }
+  PropertiesService.getScriptProperties().setProperty("GITHUB_TOKEN", t);
+  return { success:true, message:"Token saved & verified.", masked:maskGithubToken(t) };
+}
+
+function clearGithubToken() {
+  try { PropertiesService.getScriptProperties().deleteProperty("GITHUB_TOKEN"); } catch(ex){}
+  return { success:true, message:"Token cleared." };
 }
 
 function githubPushJson(filePath, data, message) {
