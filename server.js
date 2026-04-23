@@ -6,14 +6,14 @@ const url    = require('url');
 const crypto = require('crypto');
 
 const PORT      = 5000;
-const BASE_PATH = '/Admin-Log-Sync';
+const BASE_PATH = '/mooviedsweb';
 const ROOT_DIR  = __dirname;
 
 // ── GAS & GitHub config ───────────────────────────────────────────────────────
 const GAS_URL = 'https://script.google.com/macros/s/AKfycbwMcrOMCPmRMgbWunm0eQnweODbktt_6yvv8oKR8p61_n4ULAsuCD2wBtokaNPN4VyT/exec';
 const GITHUB_TOKEN  = process.env.GITHUB_TOKEN || '';
 const GITHUB_OWNER  = 'mooviedwebsite';
-const GITHUB_REPO   = 'Admin-Log-Sync';
+const GITHUB_REPO   = 'mooviedsweb';
 const GITHUB_BRANCH = 'main';
 
 // ── Local data files (primary data store — instant reads/writes) ──────────────
